@@ -1,0 +1,8 @@
+{
+  "name": "XecutionAI AgentX",
+  "description": "Fully autonomous one-click AI agent asset liquidity and SaaS creation studio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
