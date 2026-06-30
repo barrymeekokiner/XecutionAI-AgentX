@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { History, X, Clock, Trash2, FileText } from 'lucide-react';
+import { History, X, Clock, Trash2, FileText, Users } from 'lucide-react';
 import { ExecutionResult } from '../types';
 
 interface Props {
@@ -45,6 +45,12 @@ export const HistorySidebar: React.FC<Props> = ({ history, isOpen, onClose, onSe
               <span className="text-[10px] font-mono text-brand-primary/60">
                 {new Date(item.timestamp).toLocaleDateString()} {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
+              {item.teamId && (
+                <div className="flex items-center gap-1 text-[8px] font-bold text-brand-secondary uppercase bg-brand-secondary/10 px-1.5 py-0.5 rounded border border-brand-secondary/20">
+                  <Users className="w-2.5 h-2.5" />
+                  Team
+                </div>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();

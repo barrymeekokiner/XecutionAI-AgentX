@@ -19,7 +19,11 @@ import {
   ChevronDown,
   Cloud,
   Database,
-  AlertCircle
+  AlertCircle,
+  Terminal,
+  Zap,
+  Activity,
+  Users
 } from 'lucide-react';
 import { AppSettings, ExecutionResult } from '../types';
 import { User } from '../lib/firebase';
@@ -68,9 +72,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   }, [isOpen, currentSettings]);
 
   const models = [
-    { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', tier: 'FREE', speed: 'Ultra-Fast', intelligence: 'Standard' },
-    { id: 'gemini-3.1-flash', label: 'Gemini 3.1 Flash', tier: 'STANDARD', speed: 'Fast', intelligence: 'High' },
-    { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro', tier: 'PREMIUM', speed: 'Balanced', intelligence: 'Extreme' }
+    { id: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash-8B', tier: 'FREE', speed: 'Ultra-Fast', intelligence: 'Standard' },
+    { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', tier: 'STANDARD', speed: 'Fast', intelligence: 'High' },
+    { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', tier: 'PREMIUM', speed: 'Balanced', intelligence: 'Extreme' }
   ];
 
   const handleTestKey = async () => {
@@ -326,6 +330,140 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     {!user && settings.persistenceMode === 'local' && (
                       <p className="text-[8px] text-white/20 uppercase tracking-widest text-center">Neural Sync required for cloud storage.</p>
                     )}
+                  </div>
+
+                  {/* AI Verbosity & Density */}
+                  <div className="space-y-6 pt-4 border-t border-white/5">
+                    <div className="space-y-4">
+                      <label className="text-xs font-bold text-white/60 uppercase tracking-widest flex items-center gap-2">
+                        <Terminal className="w-3 h-3 text-brand-primary" /> 
+                        Execution Verbosity
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['minimal', 'balanced', 'comprehensive'] as const).map((v) => (
+                          <button
+                            key={v}
+                            onClick={() => setSettings({ ...settings, verbosity: v })}
+                            className={`py-2 rounded-lg border text-[9px] font-bold uppercase tracking-widest transition-all ${
+                              settings.verbosity === v 
+                                ? 'bg-brand-primary/20 border-brand-primary text-brand-primary shadow-[0_0_10px_rgba(var(--brand-primary-rgb),0.2)]' 
+                                : 'bg-black/40 border-white/5 text-white/40 hover:border-white/10'
+                            }`}
+                          >
+                            {v}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-bold text-white/60 uppercase tracking-widest flex items-center gap-2">
+                          <Palette className="w-3 h-3 text-brand-secondary" /> 
+                          Neural Intensity
+                        </label>
+                        <span className="text-[10px] font-mono text-brand-secondary font-bold">{settings.neuralIntensity}%</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={settings.neuralIntensity}
+                        onChange={(e) => setSettings({ ...settings, neuralIntensity: parseInt(e.target.value) })}
+                        className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-brand-secondary"
+                      />
+                      <p className="text-[8px] text-white/20 italic">Controls the visual complexity and animation density of the interface.</p>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-3.5 h-3.5 text-brand-primary" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-white">Experimental Features</span>
+                        </div>
+                        <p className="text-[8px] text-white/40 leading-tight">Enable Neural Outcome Rehearsal and Vibe-Sync sequencing.</p>
+                      </div>
+                      <button
+                        onClick={() => setSettings({ ...settings, experimentalFeatures: !settings.experimentalFeatures })}
+                        className={`w-10 h-5 rounded-full transition-all relative ${settings.experimentalFeatures ? 'bg-brand-primary' : 'bg-white/10'}`}
+                      >
+                        <motion.div 
+                          animate={{ x: settings.experimentalFeatures ? 22 : 4 }}
+                          className={`absolute top-1 w-3 h-3 rounded-full ${settings.experimentalFeatures ? 'bg-black' : 'bg-white/40'}`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-3.5 h-3.5 text-brand-primary" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-white">Manual Agent Override</span>
+                        </div>
+                        <p className="text-[8px] text-white/40 leading-tight">Pause autonomous orchestration to inject direct instructions.</p>
+                      </div>
+                      <button
+                        onClick={() => setSettings({ ...settings, manualAgentOverride: !settings.manualAgentOverride })}
+                        className={`w-10 h-5 rounded-full transition-all relative ${settings.manualAgentOverride ? 'bg-brand-primary' : 'bg-white/10'}`}
+                      >
+                        <motion.div 
+                          animate={{ x: settings.manualAgentOverride ? 22 : 4 }}
+                          className={`absolute top-1 w-3 h-3 rounded-full ${settings.manualAgentOverride ? 'bg-black' : 'bg-white/40'}`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-white/5">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Activity className="w-3.5 h-3.5 text-brand-secondary" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-white">Neural Auto-Scaling</span>
+                          </div>
+                          <p className="text-[8px] text-white/40 leading-tight">Automatically adjust instance capacity based on active load.</p>
+                        </div>
+                        <button
+                          onClick={() => setSettings({ ...settings, autoScaling: !settings.autoScaling })}
+                          className={`w-10 h-5 rounded-full transition-all relative ${settings.autoScaling ? 'bg-brand-secondary' : 'bg-white/10'}`}
+                        >
+                          <motion.div 
+                            animate={{ x: settings.autoScaling ? 22 : 4 }}
+                            className={`absolute top-1 w-3 h-3 rounded-full ${settings.autoScaling ? 'bg-black' : 'bg-white/40'}`}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <label className="text-[9px] font-bold text-white/40 uppercase tracking-widest">CPU Threshold</label>
+                            <span className="text-[9px] font-mono text-brand-primary">{settings.customCpuThreshold || 80}%</span>
+                          </div>
+                          <input 
+                            type="range"
+                            min="10"
+                            max="100"
+                            value={settings.customCpuThreshold || 80}
+                            onChange={(e) => setSettings({ ...settings, customCpuThreshold: parseInt(e.target.value) })}
+                            className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-brand-primary"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <label className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Memory Threshold</label>
+                            <span className="text-[9px] font-mono text-brand-secondary">{settings.customMemoryThreshold || 85}%</span>
+                          </div>
+                          <input 
+                            type="range"
+                            min="10"
+                            max="100"
+                            value={settings.customMemoryThreshold || 85}
+                            onChange={(e) => setSettings({ ...settings, customMemoryThreshold: parseInt(e.target.value) })}
+                            className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-brand-secondary"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Persona Override */}

@@ -23,11 +23,20 @@ import {
   Globe,
   Search,
   Code2,
-  Play
+  Play,
+  Users,
+  ChevronRight,
+  MessageSquare,
+  PlusCircle,
+  AlertTriangle,
+  HeartPulse
 } from 'lucide-react';
 import { ExecutionFeed } from './components/ExecutionFeed';
 import { LiquidityResult } from './components/LiquidityResult';
 import { SaaSResult } from './components/SaaSResult';
+import { SaaSMarketplace } from './components/SaaSMarketplace';
+import { EnterpriseDashboard } from './components/EnterpriseDashboard';
+import { CreatorStudio } from './components/CreatorStudio';
 import { RiskReport } from './components/RiskReport';
 import { MarketingResult } from './components/MarketingResult';
 import { VibeCoding } from './components/VibeCoding';
@@ -38,13 +47,44 @@ import { HistorySummary } from './components/HistorySummary';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsDialog } from './components/SettingsDialog';
 import { useFirebase } from './components/FirebaseProvider';
-import { db, handleFirestoreError, OperationType, collection, addDoc, query, where, orderBy, onSnapshot, User, setDoc, doc, getDoc } from './lib/firebase';
+import { db, handleFirestoreError, OperationType, collection, addDoc, query, where, orderBy, onSnapshot, User, setDoc, doc, getDoc, deleteDoc } from './lib/firebase';
 import { LogOut, User as UserIcon } from 'lucide-react';
 import { Settings as SettingsIcon, Palette, Zap as ZapIcon, Terminal as TerminalIcon, X } from 'lucide-react';
 
 import { WelcomeTour } from './components/WelcomeTour';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import { ResourceMonitor } from './components/ResourceMonitor';
+import { NeuralRehearsal } from './components/NeuralRehearsal';
+
+import { MarketIntelligence } from './components/MarketIntelligence';
+import { SaaSGenome } from './components/SaaSGenome';
+import { VentureCouncil } from './components/VentureCouncil';
+import { RevenueProjection } from './components/RevenueProjection';
+import { GlobalResourceEfficiency } from './components/GlobalResourceEfficiency';
+import { ExecutiveSummary } from './components/ExecutiveSummary';
+import { SaaSGenomeChart } from './components/SaaSGenomeChart';
+import { AgentPerformanceDashboard } from './components/AgentPerformanceDashboard';
+import { AgentDialoguePanel } from './components/AgentDialoguePanel';
+import { ProjectForge } from './components/ProjectForge';
+import { 
+  ResourceMetric as ResourceMetricType, 
+  AgentStatus, 
+  AgentMessage, 
+  AgentPerformanceMetrics,
+  AgentLog, 
+  ExecutionResult, 
+  AppSettings, 
+  ThemeType, 
+  VibePrompt,
+  MarketIntelligence as MarketIntelligenceType,
+  SaaSGenome as SaaSGenomeType,
+  CouncilOpinion,
+  RevenueProjection as RevenueProjectionType,
+  MarketIntelligenceEngineReport
+} from './types';
+import { AgentOrchestratorTree } from './components/AgentOrchestratorTree';
+import { AgentRole } from './server/agents';
+import { MarketEngineDashboard } from './components/MarketEngineDashboard';
 
 import { SAAS_CONCEPTS, SaaSConcept } from './data/saasConcepts';
 import { StripeCheckout } from './components/StripeCheckout';
@@ -66,8 +106,25 @@ async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promis
   return fetch(url, options);
 }
 
-const LogPanel = ({ logs, isOpen, onClose, theme, onClear }: { logs: AgentLog[], isOpen: boolean, onClose: () => void, theme: ThemeType, onClear: () => void }) => {
+const LogPanel = ({ 
+  logs, 
+  isOpen, 
+  onClose, 
+  theme, 
+  onClear,
+  agentStatuses,
+  activeRole
+}: { 
+  logs: AgentLog[], 
+  isOpen: boolean, 
+  onClose: () => void, 
+  theme: ThemeType, 
+  onClear: () => void,
+  agentStatuses: Record<AgentRole, AgentStatus>,
+  activeRole?: AgentRole
+}) => {
   const [autoScroll, setAutoScroll] = React.useState(true);
+  const [showTree, setShowTree] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -83,7 +140,7 @@ const LogPanel = ({ logs, isOpen, onClose, theme, onClear }: { logs: AgentLog[],
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
-          className="fixed bottom-6 right-6 w-96 max-h-[500px] bg-app-bg border border-white/10 rounded-lg shadow-2xl z-50 flex flex-col overflow-hidden"
+          className="fixed bottom-6 right-6 w-[450px] max-h-[600px] bg-app-bg border border-white/10 rounded-lg shadow-2xl z-50 flex flex-col overflow-hidden"
         >
           <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
             <div className="flex items-center gap-2">
@@ -91,6 +148,13 @@ const LogPanel = ({ logs, isOpen, onClose, theme, onClear }: { logs: AgentLog[],
               <span className="text-xs font-bold uppercase tracking-widest font-mono">Neural Telemetry</span>
             </div>
             <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setShowTree(!showTree)} 
+                className={`p-1.5 rounded transition-all ${showTree ? 'text-brand-primary bg-brand-primary/10' : 'text-white/20 hover:text-white/40'}`}
+                title="Toggle Cluster View"
+              >
+                <Users className="w-3.5 h-3.5" />
+              </button>
               <button 
                 onClick={() => setAutoScroll(!autoScroll)} 
                 className={`p-1.5 rounded transition-all ${autoScroll ? 'text-brand-primary bg-brand-primary/10' : 'text-white/20 hover:text-white/40'}`}
@@ -110,6 +174,12 @@ const LogPanel = ({ logs, isOpen, onClose, theme, onClear }: { logs: AgentLog[],
               </button>
             </div>
           </div>
+
+          {showTree && (
+            <div className="p-4 border-b border-white/10 bg-black/20">
+              <AgentOrchestratorTree activeRole={activeRole} statuses={agentStatuses} />
+            </div>
+          )}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-[10px] custom-scrollbar">
             {logs.length === 0 && (
               <div className="text-white/20 italic text-center py-10">No active neural streams...</div>
@@ -117,18 +187,42 @@ const LogPanel = ({ logs, isOpen, onClose, theme, onClear }: { logs: AgentLog[],
             {logs.map((log) => (
               <div key={log.id} className="border-l-2 border-brand-primary/20 pl-3 py-1 animate-in fade-in slide-in-from-left-2">
                 <div className="flex justify-between items-start mb-1">
-                  <span className={`font-bold ${
-                    log.status === 'success' ? 'text-green-400' : 
-                    log.status === 'warning' ? 'text-yellow-400' : 
-                    log.status === 'error' ? 'text-red-400' : 'text-brand-secondary'
-                  }`}>
-                    [{log.agent}]
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-bold ${
+                      log.status === 'success' ? 'text-green-400' : 
+                      log.status === 'warning' ? 'text-yellow-400' : 
+                      log.status === 'error' ? 'text-red-400' : 'text-brand-secondary'
+                    }`}>
+                      [{log.agent}]
+                    </span>
+                    {['CEO', 'CTO', 'Growth', 'Finance', 'Security', 'MarketResearch', 'MARKETING'].includes(log.agent) && (
+                      <div className="flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/5 scale-75 origin-left">
+                        <div className={`w-1 h-1 rounded-full ${agentStatuses[log.agent as AgentRole]?.status === 'working' ? 'bg-brand-primary animate-pulse' : agentStatuses[log.agent as AgentRole]?.status === 'thinking' ? 'bg-brand-secondary animate-pulse' : 'bg-white/20'}`} />
+                        <span className="text-[7px] text-white/40 uppercase tracking-tighter">{agentStatuses[log.agent as AgentRole]?.status || 'idle'}</span>
+                      </div>
+                    )}
+                  </div>
                   <span className="text-[8px] text-white/20">
                     {new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </span>
                 </div>
-                <div className="text-white/70 leading-relaxed">{log.message}</div>
+                <div className="text-white/70 leading-relaxed mb-1">{log.message}</div>
+
+                {/* Reasoning Extractor */}
+                {log.agent !== 'SYSTEM' && log.agent !== 'DEVELOPER' && (
+                  <div className="mt-2 pt-2 border-t border-white/5 group/reason">
+                    <details className="cursor-pointer">
+                      <summary className="text-[7px] text-brand-primary/40 uppercase font-bold hover:text-brand-primary transition-colors flex items-center gap-1 list-none">
+                        <Zap className="w-2 h-2" />
+                        Extract Neural Rationale
+                      </summary>
+                      <div className="mt-2 p-2 bg-black/40 rounded border border-white/5 text-[8px] text-white/40 italic leading-tight">
+                        Analyzing core request vectors... Cross-referencing {log.agent} knowledge base... 
+                        Decision logic: High confidence interval detected based on grounding scan.
+                      </div>
+                    </details>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -189,6 +283,8 @@ export default function App() {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'liquidity' | 'saas' | 'both'>('both');
   const [loading, setLoading] = useState(false);
+  const [intelligenceLoading, setIntelligenceLoading] = useState(false);
+  const [intelligenceResult, setIntelligenceResult] = useState<MarketIntelligenceType | null>(null);
   const [loadingStep, setLoadingStep] = useState<string>('');
   const [requestQueue, setRequestQueue] = useState<(() => Promise<void>)[]>([]);
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
@@ -196,7 +292,13 @@ export default function App() {
   const [currentAutoStep, setCurrentAutoStep] = useState(-1);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ExecutionResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'plan' | 'marketing' | 'risks' | 'logs' | 'resources'>('plan');
+  const [marketEngineReport, setMarketEngineReport] = useState<MarketIntelligenceEngineReport | null>(null);
+  const [saasGenome, setSaasGenome] = useState<SaaSGenomeType | null>(null);
+  const [performanceMetrics, setPerformanceMetrics] = useState<AgentPerformanceMetrics[]>([]);
+  const [founderMode, setFounderMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<'plan' | 'market' | 'genome' | 'council' | 'revenue' | 'marketing' | 'risks' | 'logs' | 'resources' | 'efficiency' | 'summary' | 'market_engine' | 'performance' | 'forge' | 'marketplace' | 'enterprise' | 'creator'>('plan');
+  const [isDialogueOpen, setIsDialogueOpen] = useState(false);
+  const [efficiencyMetrics, setEfficiencyMetrics] = useState<ResourceMetricType[]>([]);
   const [blueprints, setBlueprints] = useState<{ label: string; value: string; mode: string }[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<{label: string, append: string}[]>([]);
@@ -215,7 +317,63 @@ export default function App() {
   const [showTour, setShowTour] = useState(() => !localStorage.getItem('tour_completed'));
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [hasWarnedUsage, setHasWarnedUsage] = useState(false);
+  const [activeTelemetryTab, setActiveTelemetryTab] = useState<'system' | 'agents'>('system');
+  const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
+  const [agentStatuses, setAgentStatuses] = useState<Record<AgentRole, AgentStatus>>({
+    CEO: { status: 'idle', load: 0, lastActive: Date.now() },
+    CTO: { status: 'idle', load: 0, lastActive: Date.now() },
+    Growth: { status: 'idle', load: 0, lastActive: Date.now() },
+    Finance: { status: 'idle', load: 0, lastActive: Date.now() },
+    Security: { status: 'idle', load: 0, lastActive: Date.now() },
+    MarketResearch: { status: 'idle', load: 0, lastActive: Date.now() },
+    Legal: { status: 'idle', load: 0, lastActive: Date.now() },
+    Compliance: { status: 'idle', load: 0, lastActive: Date.now() },
+    Operations: { status: 'idle', load: 0, lastActive: Date.now() }
+  });
+  const [activeRole, setActiveRole] = useState<AgentRole | undefined>();
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Enterprise Brand Config
+  const [teamConfig, setTeamConfig] = useState<{
+    companyName: string;
+    logo?: string;
+    primaryColor: string;
+    secondaryColor?: string;
+    tokenUsage: { current: number; limit: number };
+    topConsumers: { name: string; tokens: number }[];
+  }>({
+    companyName: 'Neural Dynamics',
+    primaryColor: '#00ff9d',
+    secondaryColor: '#a855f7',
+    tokenUsage: { current: 820000, limit: 1000000 },
+    topConsumers: [
+      { name: 'architect@neural.io', tokens: 450000 },
+      { name: 'owner@neural.io', tokens: 280000 },
+      { name: 'analyst@neural.io', tokens: 90000 }
+    ]
+  });
+
+  const [showQuotaBreakdown, setShowQuotaBreakdown] = useState(false);
+
+  // Firestore Enterprise Theme Sync
+  useEffect(() => {
+    // Watch the enterprise config document
+    const unsub = onSnapshot(doc(db, 'teams', 'enterprise_config'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setTeamConfig(prev => ({
+          ...prev,
+          companyName: data.companyName || prev.companyName,
+          logo: data.logo || prev.logo,
+          primaryColor: data.primaryColor || prev.primaryColor,
+          secondaryColor: data.secondaryColor || prev.secondaryColor,
+          tokenUsage: data.tokenUsage || prev.tokenUsage
+        }));
+      }
+    });
+
+    return () => unsub();
+  }, []);
 
   // Settings State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -235,10 +393,20 @@ export default function App() {
     const saved = localStorage.getItem('system_settings');
     const defaults: AppSettings = {
       apiKey: '',
-      model: 'gemini-3.1-flash-lite',
+      model: 'gemini-1.5-flash-8b',
       autoRefine: true,
       persistenceMode: 'local',
-      tier: 'free'
+      tier: 'free',
+      verbosity: 'balanced',
+      neuralIntensity: 85,
+      experimentalFeatures: false,
+      autoSequencing: false,
+      autoScaling: false,
+      gpuThreshold: 90,
+      computeThreshold: 90,
+      customCpuThreshold: 80,
+      customMemoryThreshold: 85,
+      manualAgentOverride: false
     };
 
     if (saved) {
@@ -250,6 +418,42 @@ export default function App() {
     }
     return defaults;
   });
+
+  // Fetch agent messages for telemetry
+  useEffect(() => {
+    const fetchPerformance = async () => {
+      try {
+        const res = await fetch('/api/agents/performance');
+        if (res.ok) {
+          const data = await res.json();
+          setPerformanceMetrics(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch performance metrics", e);
+      }
+    };
+
+    if (activeTelemetryTab === 'agents' && result?.id) {
+      const fetchMessages = async () => {
+        try {
+          const res = await fetch(`/api/agents/messages?buildId=${result.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            setAgentMessages(data);
+          }
+        } catch (e) {
+          console.error("Failed to fetch agent messages", e);
+        }
+      };
+      fetchMessages();
+      fetchPerformance();
+      const interval = setInterval(() => {
+        fetchMessages();
+        fetchPerformance();
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTelemetryTab, result?.id]);
 
   // Usage Monitoring
   useEffect(() => {
@@ -306,16 +510,36 @@ export default function App() {
   useEffect(() => {
     document.documentElement.className = `theme-${theme}`;
     localStorage.setItem('system_theme', theme);
-  }, [theme]);
+    
+    // Apply Enterprise Branding
+    if (teamConfig.primaryColor) {
+      document.documentElement.style.setProperty('--brand-primary', teamConfig.primaryColor);
+    }
+    if (teamConfig.secondaryColor) {
+      document.documentElement.style.setProperty('--brand-secondary', teamConfig.secondaryColor);
+    }
+  }, [theme, teamConfig.primaryColor, teamConfig.secondaryColor]);
 
   const addLog = (agent: AgentLog['agent'], message: string, status: AgentLog['status'] = 'info') => {
-    setLiveLogs(prev => [{
+    const newLog: AgentLog = {
       id: Math.random().toString(36).substr(2, 9),
       timestamp: Date.now(),
       agent,
       message,
       status
-    }, ...prev].slice(0, 50));
+    };
+    setLiveLogs(prev => [newLog, ...prev].slice(0, 100));
+
+    // Update heartbeat for the agent
+    if (['CEO', 'CTO', 'Growth', 'Finance', 'Security', 'MarketResearch', 'MARKETING'].includes(agent)) {
+      setAgentStatuses(prev => ({
+        ...prev,
+        [agent as AgentRole]: {
+          ...prev[agent as AgentRole],
+          lastActive: Date.now()
+        }
+      }));
+    }
   };
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -437,6 +661,22 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [loading, isLogsOpen, isSettingsOpen, isHistoryOpen]);
+
+  // Load Efficiency Metrics
+  useEffect(() => {
+    const saved = localStorage.getItem('efficiency_metrics');
+    if (saved) {
+      try {
+        setEfficiencyMetrics(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse efficiency metrics", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('efficiency_metrics', JSON.stringify(efficiencyMetrics));
+  }, [efficiencyMetrics]);
 
   // Fetch Trending Blueprints
   const fetchTrends = async (modelOverride?: string) => {
@@ -613,7 +853,7 @@ export default function App() {
     }
   }, [settings, user]);
 
-  const fallbackModels = ['gemini-3.1-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-preview'];
+  const fallbackModels = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.5-pro'];
 
   const executeWithFallback = async (currentModel: string, retryCount = 0): Promise<{ data: any; response: Response }> => {
     const headers = getHeaders();
@@ -713,6 +953,68 @@ export default function App() {
     setToast({ message: 'Neural sequence complete. Application deployed.', type: 'success' });
   };
 
+  const runMarketIntelligence = async () => {
+    if (!input.trim()) return;
+    setIntelligenceLoading(true);
+    setIntelligenceResult(null);
+    setMarketEngineReport(null);
+    setSaasGenome(null);
+    setActiveTab('market');
+    
+    addLog('MARKETING', 'Initiating Autonomous Market Intelligence Scan...', 'info');
+    addLog('MARKETING', 'Scanning Reddit, Product Hunt, and Google Trends via grounding...', 'info');
+    
+    try {
+      // Run the standard intelligence scan
+      const response = await fetch('/api/market/intelligence', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ input })
+      });
+      
+      if (!response.ok) throw new Error('Market scan failed');
+      const data = await response.json();
+      setIntelligenceResult(data);
+      addLog('MARKETING', `Market intelligence retrieved. Opportunity Score: ${data.opportunityScore}/100`, 'success');
+
+      // Also trigger the advanced engine
+      addLog('MARKETING', 'Synthesizing Market Intelligence Engine Report...', 'info');
+      const engineRes = await fetch('/api/market/analyze', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ query: input, tier: settings.tier }),
+      });
+      
+      if (engineRes.ok) {
+        const engineData = await engineRes.json();
+        setMarketEngineReport(engineData);
+        addLog('MARKETING', 'Advanced market engine analysis complete.', 'success');
+      }
+
+      // Trigger SaaS Genome Engine
+      addLog('ORCHESTRATOR', 'Decoding Proprietary SaaS Genome...', 'info');
+      const genomeRes = await fetch('/api/saas/genome', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ input, mode })
+      });
+
+      if (genomeRes.ok) {
+        const genomeData = await genomeRes.json();
+        setSaasGenome(genomeData);
+        addLog('ORCHESTRATOR', 'SaaS DNA sequencing finalized.', 'success');
+      }
+      
+      setToast({ message: "Market scan complete.", type: 'success' });
+    } catch (error: any) {
+      console.error(error);
+      addLog('MARKETING', 'Neural scan interrupted: ' + error.message, 'error');
+      setToast({ message: "Scan failed: " + error.message, type: 'error' });
+    } finally {
+      setIntelligenceLoading(false);
+    }
+  };
+
   const handleExecute = async () => {
     if (!input || loading) return;
     
@@ -738,6 +1040,57 @@ export default function App() {
         setProgress(15);
         addLog('SYSTEM', 'Verifying neural gateway status...', 'info');
         
+        if (founderMode) {
+          setLoadingStep('Decoding SaaS DNA...');
+          addLog('DEVELOPER', 'Extracting core product identifiers...', 'info');
+          const genomeRes = await fetch('/api/neural/genome', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ input })
+          });
+          const genomeData = await genomeRes.json();
+          addLog('DEVELOPER', 'SaaS Genome decoded successfully.', 'success');
+
+          setLoadingStep('Grounding Market Scan...');
+          addLog('MARKETING', 'Initiating cross-platform intelligence sweep...', 'info');
+          const intelRes = await fetch('/api/market/intelligence', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ input })
+          });
+          const intelData = await intelRes.json();
+          setIntelligenceResult(intelData);
+          addLog('MARKETING', `Opportunity Score: ${intelData.opportunityScore}/100`, 'success');
+
+          setLoadingStep('Assembling Venture Council...');
+          addLog('ORCHESTRATOR', 'Summoning agentic peers for critical review...', 'info');
+          const councilRes = await fetch('/api/neural/council', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ 
+              input, 
+              mode,
+              manualOverride: settings.manualAgentOverride,
+              buildId: result?.id 
+            })
+          });
+          const councilData = await councilRes.json();
+          addLog('ORCHESTRATOR', 'Council debate concluded. Consensus reached.', 'success');
+
+          setLoadingStep('Simulating Revenue Model...');
+          addLog('SYSTEM', 'Running 24-month neural projection...', 'info');
+          const projRes = await fetch('/api/neural/projection', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ input })
+          });
+          const projData = await projRes.json();
+          addLog('SYSTEM', 'Revenue simulation complete.', 'success');
+
+          // Store temporary founder data
+          (window as any)._founderData = { genomeData, intelData, councilData, projData };
+        }
+
         setLoadingStep('Autonomous Planning Phase...');
         setProgress(30);
         addLog('ORCHESTRATOR', `Spawning Agent Clusters for ${mode.toUpperCase()} mode`, 'info');
@@ -759,6 +1112,7 @@ export default function App() {
         addLog('LIQUIDITY', 'Mapping high-velocity exit channels...', 'success');
         addLog('SRE', 'Analyzing infrastructure bottlenecks...', 'info');
         addLog('ORCHESTRATOR', 'Strategic alignment confirmed.', 'success');
+        addLog('ORCHESTRATOR', 'Strategic alignment confirmed.', 'success');
 
         setLoadingStep('Finalizing Strategic Alignment...');
         await new Promise(r => setTimeout(r, 600));
@@ -767,14 +1121,21 @@ export default function App() {
         addLog('COMPRESSOR', 'Optimizing execution sequence for speed-to-liquidity', 'success');
         addLog('SYSTEM', 'Compiling execution manifest...', 'info');
 
+        const founderData = (window as any)._founderData || {};
         const enrichedResult: ExecutionResult = {
           ...data,
           id: crypto.randomUUID(),
           timestamp: Date.now(),
           input: input,
           mode: mode,
-          actualizedCashout: mode === 'liquidity' ? (data.liquidityPlan?.assetTable?.reduce((sum: number, a: any) => sum + a.flashValue, 0) || 0) * 0.8 : 0
+          actualizedCashout: mode === 'liquidity' ? (data.liquidityPlan?.assetTable?.reduce((sum: number, a: any) => sum + a.flashValue, 0) || 0) * 0.8 : 0,
+          saasGenome: founderData.genomeData,
+          marketIntelligence: founderData.intelData,
+          councilDebate: founderData.councilData,
+          revenueProjection: founderData.projData
         };
+        
+        delete (window as any)._founderData;
 
         if (enrichedResult.saasBlueprint) {
           setVibePrompts(enrichedResult.saasBlueprint.vibePrompts || []);
@@ -868,20 +1229,80 @@ export default function App() {
     <ErrorBoundary>
       <div className="h-screen bg-app-bg text-[#e0e0e0] font-sans selection:bg-brand-primary/30 flex flex-col overflow-hidden">
         {/* Header */}
-      <header className="sticky top-0 z-50 bg-app-bg/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-brand-primary rounded-sm flex items-center justify-center shadow-[0_0_15px_rgba(var(--brand-primary-rgb),0.4)] transition-all hover:rotate-12 theme-glow">
-            <span className="text-black font-black text-xl italic tracking-tighter">X</span>
+      <header className="sticky top-0 z-50 bg-app-bg/80 backdrop-blur-md border-b border-white/10 shrink-0">
+        <div className="max-w-screen-2xl mx-auto px-6 py-4 flex justify-between items-center w-full">
+          <div className="flex items-center gap-4 shrink-0">
+            <div className="w-10 h-10 bg-brand-primary rounded-sm flex items-center justify-center shadow-[0_0_15px_rgba(var(--brand-primary-rgb),0.4)] transition-all hover:rotate-12 theme-glow cursor-pointer overflow-hidden" onClick={() => window.location.reload()}>
+              {teamConfig.logo ? (
+                <img src={teamConfig.logo} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-black font-black text-xl italic tracking-tighter">X</span>
+              )}
+            </div>
+            <div className="hidden sm:block">
+              <h1 className="text-xl font-bold tracking-tighter text-white uppercase italic theme-text-glow">{teamConfig.companyName} // AgentX</h1>
+              <div className="flex items-center gap-3">
+                <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-mono">Enterprise Nexus</p>
+                <div className="relative">
+                  <button 
+                    onMouseEnter={() => setShowQuotaBreakdown(true)}
+                    onMouseLeave={() => setShowQuotaBreakdown(false)}
+                    className="flex items-center gap-1.5 transition-all cursor-help group"
+                  >
+                    <HeartPulse className={`w-3 h-3 ${
+                      (teamConfig.tokenUsage.current / teamConfig.tokenUsage.limit) > 0.9 ? 'text-brand-alert animate-pulse' :
+                      (teamConfig.tokenUsage.current / teamConfig.tokenUsage.limit) > 0.7 ? 'text-orange-400' : 'text-brand-primary'
+                    }`} />
+                    <span className="text-[8px] font-bold uppercase tracking-widest text-white/60 group-hover:text-white">Quota Health</span>
+                  </button>
+
+                  <AnimatePresence>
+                    {showQuotaBreakdown && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute top-full left-0 mt-2 w-64 bg-app-bg border border-white/10 rounded-xl p-4 shadow-2xl z-50 backdrop-blur-xl"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                            <span className="text-[10px] font-bold text-white uppercase tracking-widest">Monthly Quota</span>
+                            <span className="text-[10px] font-mono text-white/40">{Math.round((teamConfig.tokenUsage.current / teamConfig.tokenUsage.limit) * 100)}%</span>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest mb-1">Top Consumers</p>
+                            {teamConfig.topConsumers.map((user, i) => (
+                              <div key={i} className="flex justify-between items-center">
+                                <span className="text-[10px] text-white/60 truncate max-w-[120px]">{user.name}</span>
+                                <span className="text-[10px] font-mono text-brand-primary">{(user.tokens / 1000).toFixed(0)}k</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="pt-2 border-t border-white/5 flex items-center gap-2">
+                            <Info className="w-3 h-3 text-white/20" />
+                            <p className="text-[8px] text-white/40 leading-tight">Neural assets will degrade if quota exceeds 100%.</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tighter text-white uppercase italic theme-text-glow">XecutionAI // AgentX</h1>
-            <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-mono">One-Click Asset Liquidity & SaaS Studio</p>
-          </div>
-        </div>
-        
-          <div className="flex items-center gap-4">
+          
+          <div className="flex items-center gap-4 ml-4">
             <ThemeSwitcher current={theme} onSelect={setTheme} />
             <div className="flex items-center gap-4 border-r border-white/10 pr-8">
+              <button 
+                onClick={() => setIsDialogueOpen(!isDialogueOpen)}
+                className={`p-2 rounded-lg transition-all ${isDialogueOpen ? 'bg-brand-primary text-black' : 'bg-white/5 text-white/40 hover:text-white'}`}
+                title="Toggle Agent Dialogue"
+              >
+                <MessageSquare className="w-4 h-4" />
+              </button>
               <button 
                 onClick={() => setIsLogsOpen(!isLogsOpen)}
                 className={`flex items-center gap-2 text-[10px] uppercase tracking-widest border px-3 py-1.5 rounded transition-all ${
@@ -949,15 +1370,18 @@ export default function App() {
                 )}
               </div>
             </div>
-          <div className="text-[9px] text-white/30 font-mono flex flex-col items-end">
-            <span>⌘+↵ EXECUTE</span>
-            <span>⌘+K FOCUS</span>
+              <div className="text-[9px] text-white/30 font-mono hidden md:flex flex-col items-end shrink-0">
+                <span>⌘+↵ EXECUTE</span>
+                <span>⌘+K FOCUS</span>
+              </div>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="flex-1 grid grid-cols-12 gap-6 overflow-hidden p-6">
-        {/* Left Column: Controls */}
+        <main className="flex-1 overflow-y-auto custom-scrollbar bg-[radial-gradient(circle_at_50%_0%,rgba(var(--brand-primary-rgb),0.05),transparent_70%)]">
+          <div className="max-w-screen-2xl mx-auto p-6 md:p-12">
+            <div className="grid grid-cols-12 gap-6">
+              {/* Left Column: Controls */}
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar">
           <HistorySummary history={history} />
           <div className="bg-white/5 theme-border rounded-lg p-5 transition-all duration-500">
@@ -1124,20 +1548,56 @@ export default function App() {
                 </AnimatePresence>
               </div>
 
-              <button
-                onClick={handleExecute}
-                disabled={loading || !input}
-                className="w-full py-3 bg-brand-primary text-black font-bold text-xs uppercase rounded hover:bg-brand-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(var(--brand-primary-rgb),0.15)]"
+              <div className="flex items-center justify-between p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-xl mb-2 group cursor-pointer hover:bg-brand-primary/10 transition-colors"
+                onClick={() => setFounderMode(!founderMode)}
               >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    Initialize Sequence
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg transition-all ${founderMode ? 'bg-brand-primary text-black scale-110' : 'bg-white/5 text-white/40'}`}>
+                    <Box className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-[10px] font-bold text-white uppercase tracking-widest">Founder Mode</h4>
+                    <p className="text-[8px] text-white/30 uppercase font-mono">End-to-End Autonomous Venture Builder</p>
+                  </div>
+                </div>
+                <div className={`w-10 h-5 rounded-full transition-all relative ${founderMode ? 'bg-brand-primary' : 'bg-white/10'}`}>
+                  <motion.div 
+                    animate={{ x: founderMode ? 22 : 4 }}
+                    className={`absolute top-1 w-3 h-3 rounded-full ${founderMode ? 'bg-black' : 'bg-white/40'}`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={runMarketIntelligence}
+                  disabled={loading || intelligenceLoading || !input}
+                  className="py-3 bg-brand-secondary/20 border border-brand-secondary/50 text-brand-secondary font-bold text-[10px] uppercase rounded hover:bg-brand-secondary/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {intelligenceLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Search className="w-4 h-4" />
+                      Scan Market
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleExecute}
+                  disabled={loading || intelligenceLoading || !input}
+                  className="py-3 bg-brand-primary text-black font-bold text-xs uppercase rounded hover:bg-brand-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(var(--brand-primary-rgb),0.15)]"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      Initialize Sequence
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1265,20 +1725,45 @@ export default function App() {
               >
                 {/* Visual Tabs */}
                 <div className="flex justify-between items-end border-b border-white/10 pb-2">
-                  <div className="flex gap-4">
-                    {(['plan', 'marketing', 'risks', 'resources', 'logs'] as const).map((tab) => (
-                      <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`text-[10px] font-bold uppercase tracking-[0.2em] pb-2 transition-all relative ${
-                          activeTab === tab
-                          ? 'text-brand-primary border-b border-brand-primary'
-                          : 'text-white/30 hover:text-white'
-                        }`}
-                      >
-                        {tab}
-                      </button>
-                    ))}
+                  <div className="flex gap-4 overflow-x-auto no-scrollbar whitespace-nowrap pb-1">
+                    {(['plan', 'market', 'market_engine', 'genome', 'council', 'revenue', 'marketing', 'risks', 'resources', 'efficiency', 'performance', 'forge', 'marketplace', 'enterprise', 'creator', 'summary', 'logs'] as const).map((tab) => {
+                      // Hide tabs if no data
+                      if (tab === 'genome' && !saasGenome && !result?.saasGenome) return null;
+                      if (tab === 'council' && !result?.councilDebate) return null;
+                      if (tab === 'revenue' && !result?.revenueProjection) return null;
+                      if (tab === 'market_engine' && !marketEngineReport) return null;
+                      if (tab === 'performance' && performanceMetrics.length === 0) return null;
+                      if (tab === 'forge' && !result) return null;
+                      
+                      return (
+                        <button
+                          key={tab}
+                          onClick={() => setActiveTab(tab)}
+                          className={`text-[10px] font-bold uppercase tracking-[0.2em] pb-2 transition-all relative shrink-0 ${
+                            activeTab === tab
+                            ? 'text-brand-primary border-b border-brand-primary'
+                            : 'text-white/30 hover:text-white'
+                          }`}
+                        >
+                          {tab === 'plan' ? 'Neural Blueprint' : 
+                           tab === 'market' ? 'Grounding' : 
+                           tab === 'market_engine' ? 'Market Intelligence' : 
+                           tab === 'genome' ? 'SaaS DNA' : 
+                           tab === 'council' ? 'Venture Council' : 
+                           tab === 'revenue' ? 'Projections' : 
+                           tab === 'marketing' ? 'Market Engine' : 
+                           tab === 'risks' ? 'Risk Shield' : 
+                           tab === 'efficiency' ? 'Efficiency' :
+                           tab === 'marketplace' ? 'Marketplace' :
+                           tab === 'enterprise' ? 'Enterprise' :
+                           tab === 'creator' ? 'Creator Studio' :
+                           tab === 'performance' ? 'Performance' :
+                           tab === 'forge' ? 'Neural Forge' :
+                           tab === 'summary' ? 'Summary' :
+                           tab === 'resources' ? 'Resources' : 'Telemetry'}
+                        </button>
+                      );
+                    })}
                   </div>
                   
                   <div className="flex items-center gap-2 mb-2">
@@ -1295,6 +1780,26 @@ export default function App() {
                 <div className="space-y-8">
                   {activeTab === 'plan' && (
                     <>
+                      {/* Intelligence Alert */}
+                      {intelligenceResult && !result && (
+                         <div className="bg-brand-secondary/10 border border-brand-secondary/30 p-4 rounded-xl flex items-center justify-between gap-4 mb-6 animate-in slide-in-from-top-4 duration-500">
+                           <div className="flex items-center gap-3">
+                             <div className="p-2 bg-brand-secondary/20 rounded-lg">
+                               <Search className="w-4 h-4 text-brand-secondary" />
+                             </div>
+                             <div>
+                               <p className="text-[10px] text-white font-bold uppercase tracking-widest">Market Scan Available</p>
+                               <p className="text-[9px] text-white/40 uppercase font-mono">Opportunity Score: {intelligenceResult.opportunityScore}/100</p>
+                             </div>
+                           </div>
+                           <button 
+                             onClick={() => setActiveTab('market')}
+                             className="text-[9px] text-brand-secondary font-bold uppercase tracking-widest hover:underline"
+                           >
+                             View Analysis
+                           </button>
+                         </div>
+                      )}
                       {/* Fast Action Checklist */}
                       <div className="bg-brand-secondary/5 border border-brand-secondary/20 rounded-lg p-5">
                         <h3 className="text-[10px] font-bold text-brand-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
@@ -1324,8 +1829,61 @@ export default function App() {
                         )}
                         {result?.liquidityPlan && <LiquidityResult plan={result.liquidityPlan} />}
                         {result?.saasBuildPlan && <SaaSResult plan={result.saasBuildPlan} originalInput={input} />}
+                        
+                        {/* Experimental: Neural Rehearsal */}
+                        {settings.experimentalFeatures && (
+                          <NeuralRehearsal 
+                            plan={result.saasBuildPlan || result.liquidityPlan} 
+                            input={result.input} 
+                            settings={settings}
+                          />
+                        )}
                       </div>
                     </>
+                  )}
+
+                  {activeTab === 'market' && (
+                    <div className="space-y-6">
+                       {intelligenceLoading ? (
+                         <div className="flex flex-col items-center justify-center py-20 gap-4">
+                           <Loader2 className="w-8 h-8 text-brand-secondary animate-spin" />
+                           <p className="text-xs text-brand-secondary font-mono uppercase animate-pulse">Running autonomous grounding scan...</p>
+                         </div>
+                       ) : result?.marketIntelligence ? (
+                         <MarketIntelligence data={result.marketIntelligence} />
+                       ) : intelligenceResult ? (
+                         <MarketIntelligence data={intelligenceResult} />
+                       ) : (
+                         <div className="flex flex-col items-center justify-center py-20 gap-4 text-white/20">
+                           <Search className="w-8 h-8 opacity-20" />
+                           <p className="text-xs font-mono uppercase">Initiate market scan to see real-time intelligence</p>
+                         </div>
+                       )}
+                    </div>
+                  )}
+
+                  {activeTab === 'market_engine' && marketEngineReport && (
+                    <MarketEngineDashboard report={marketEngineReport} />
+                  )}
+
+                  {activeTab === 'genome' && (saasGenome || result?.saasGenome) && (
+                    <SaaSGenomeChart genome={saasGenome || result!.saasGenome!} />
+                  )}
+
+                  {activeTab === 'performance' && performanceMetrics.length > 0 && (
+                    <AgentPerformanceDashboard metrics={performanceMetrics} />
+                  )}
+
+                  {activeTab === 'forge' && (
+                    <ProjectForge />
+                  )}
+
+                  {activeTab === 'council' && result?.councilDebate && (
+                    <VentureCouncil debate={result.councilDebate} />
+                  )}
+
+                  {activeTab === 'revenue' && result?.revenueProjection && (
+                    <RevenueProjection projection={result.revenueProjection} />
                   )}
 
                   {activeTab === 'marketing' && result?.marketingStrategy && (
@@ -1346,7 +1904,26 @@ export default function App() {
                   )}
 
                   {activeTab === 'resources' && (
-                    <ResourceMonitor />
+                    <ResourceMonitor 
+                      settings={settings} 
+                      onUpdateSettings={(s) => setSettings(prev => ({ ...prev, ...s }))}
+                      onEmitMetric={(m) => setEfficiencyMetrics(prev => [m, ...prev].slice(0, 100))}
+                    />
+                  )}
+                  {activeTab === 'efficiency' && (
+                    <GlobalResourceEfficiency metrics={efficiencyMetrics} />
+                  )}
+                  {activeTab === 'marketplace' && (
+                    <SaaSMarketplace />
+                  )}
+                  {activeTab === 'enterprise' && (
+                    <EnterpriseDashboard />
+                  )}
+                  {activeTab === 'creator' && (
+                    <CreatorStudio />
+                  )}
+                  {activeTab === 'summary' && (
+                    <ExecutiveSummary activeBuilds={history} />
                   )}
                   {activeTab === 'logs' && (
                     <div className="bg-black/60 border border-white/10 rounded-lg p-6 min-h-[500px]">
@@ -1357,8 +1934,10 @@ export default function App() {
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
         </div>
-      </main>
+      </div>
+    </main>
 
       {/* Footer Area */}
       <footer className="shrink-0 border-t border-white/10 p-4 flex justify-between items-center text-[10px] font-mono tracking-widest bg-black/40 backdrop-blur-md">
@@ -1392,12 +1971,35 @@ export default function App() {
       </footer>
 
       <SuccessParticles active={showParticles} />
+      {/* Dialogue Stream Side Panel */}
+      <AnimatePresence>
+        {isDialogueOpen && (
+          <motion.div 
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed top-0 right-0 w-[400px] h-full z-[60] shadow-2xl"
+          >
+            <AgentDialoguePanel messages={agentMessages} />
+            <button 
+              onClick={() => setIsDialogueOpen(false)}
+              className="absolute top-4 left-[-40px] w-10 h-10 bg-brand-primary text-black flex items-center justify-center rounded-l-xl shadow-lg"
+            >
+              <Plus className="w-5 h-5 rotate-45" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <LogPanel 
         logs={liveLogs} 
         isOpen={isLogsOpen} 
         onClose={() => setIsLogsOpen(false)} 
         theme={theme} 
         onClear={() => setLiveLogs([])}
+        agentStatuses={agentStatuses}
+        activeRole={activeRole}
       />
       
       <HistorySidebar 

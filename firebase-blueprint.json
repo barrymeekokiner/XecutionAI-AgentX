@@ -1,64 +1,170 @@
 {
   "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user settings and preferences",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "settings": { "$ref": "AppSettings" },
+        "tier": { "type": "string", "enum": ["free", "standard", "premium"] },
+        "customThresholds": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "number" },
+            "memory": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "settings"]
+    },
+    "AppSettings": {
+      "title": "App Settings",
+      "description": "User application settings",
+      "type": "object",
+      "properties": {
+        "apiKey": { "type": "string" },
+        "model": { "type": "string" },
+        "autoRefine": { "type": "boolean" },
+        "persistenceMode": { "type": "string" },
+        "tier": { "type": "string" },
+        "customSystemInstruction": { "type": "string" },
+        "verbosity": { "type": "string" },
+        "neuralIntensity": { "type": "number" },
+        "experimentalFeatures": { "type": "boolean" },
+        "autoSequencing": { "type": "boolean" },
+        "autoScaling": { "type": "boolean" },
+        "gpuThreshold": { "type": "number" },
+        "computeThreshold": { "type": "number" },
+        "customCpuThreshold": { "type": "number" },
+        "customMemoryThreshold": { "type": "number" }
+      }
+    },
     "ExecutionResult": {
       "title": "Execution Result",
-      "description": "A generated XecutionAI plan or audit result.",
+      "description": "Result of an autonomous execution task",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "timestamp": { "type": "number" },
         "input": { "type": "string" },
         "mode": { "type": "string" },
-        "liquidityPlan": { "type": "object" },
-        "saasBuildPlan": { "type": "object" },
-        "saasBlueprint": { "type": "object" },
-        "marketingStrategy": { "type": "object" },
-        "riskReport": { "type": "object" },
-        "fastActionChecklist": { "type": "array", "items": { "type": "string" } },
-        "agentLogs": { "type": "array" },
-        "metrics": { "type": "object" }
-      },
-      "required": ["id", "timestamp", "input", "mode", "riskReport", "fastActionChecklist"]
-    },
-    "AppSettings": {
-      "title": "App Settings",
-      "description": "User preferences and configuration.",
-      "type": "object",
-      "properties": {
-        "apiKey": { "type": "string" },
-        "model": { "type": "string" },
-        "autoRefine": { "type": "boolean" },
-        "persistenceMode": { "type": "string", "enum": ["local", "cloud"] },
-        "tier": { "type": "string", "enum": ["free", "standard", "premium"] },
-        "customSystemInstruction": { "type": "string" }
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "estimatedTokens": { "type": "number" },
+            "latencyMs": { "type": "number" },
+            "cpuUsage": { "type": "number" },
+            "memoryUsage": { "type": "number" }
+          }
+        },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"] }
       }
     },
-    "UserProfile": {
-      "title": "User Profile",
-      "description": "Basic user identity information.",
+    "ResourceMetric": {
+      "title": "Resource Metric",
+      "description": "Aggregated resource efficiency data",
       "type": "object",
       "properties": {
-        "uid": { "type": "string" },
-        "email": { "type": "string" },
-        "displayName": { "type": "string" },
-        "photoURL": { "type": "string" },
-        "createdAt": { "type": "number" }
-      },
-      "required": ["uid", "email"]
+        "timestamp": { "type": "number" },
+        "cpu": { "type": "number" },
+        "memory": { "type": "number" },
+        "efficiency": { "type": "number" },
+        "buildId": { "type": "string" }
+      }
+    },
+    "Alert": {
+      "title": "Resource Alert",
+      "description": "User-specific resource threshold alerts",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "isRead": { "type": "boolean" }
+      }
+    },
+    "TelemetryLog": {
+      "title": "Telemetry Log",
+      "description": "Production observability logs",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "number" },
+        "level": { "type": "string", "enum": ["debug", "info", "warn", "error", "critical"] },
+        "message": { "type": "string" },
+        "metadata": { "type": "object" },
+        "userId": { "type": "string" }
+      }
+    },
+    "UsageQuota": {
+      "title": "Usage Quota",
+      "description": "Enterprise usage metering",
+      "type": "object",
+      "properties": {
+        "executions": { "type": "object", "properties": { "current": { "type": "number" }, "limit": { "type": "number" } } },
+        "apiCalls": { "type": "object", "properties": { "current": { "type": "number" }, "limit": { "type": "number" } } }
+      }
+    },
+    "MarketplaceItem": {
+      "title": "Marketplace Item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["template", "agent", "workflow"] },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "creatorId": { "type": "string" },
+        "sales": { "type": "number" }
+      }
+    },
+    "Team": {
+      "title": "Enterprise Team",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "memberUids": { "type": "array", "items": { "type": "string" } },
+        "members": { "type": "array", "items": { "type": "object" } },
+        "billingTier": { "type": "string" }
+      }
     }
   },
   "firestore": {
     "/users/{userId}": {
-      "schema": "UserProfile",
-      "description": "User profile data."
+      "schema": "User",
+      "description": "User profiles and settings"
     },
     "/users/{userId}/results/{resultId}": {
       "schema": "ExecutionResult",
-      "description": "User's generated results."
+      "description": "Historical execution results"
     },
-    "/users/{userId}/settings/global": {
-      "schema": "AppSettings",
-      "description": "User's application settings."
+    "/users/{userId}/metrics/{metricId}": {
+      "schema": "ResourceMetric",
+      "description": "Historical resource efficiency data"
+    },
+    "/users/{userId}/alerts/{alertId}": {
+      "schema": "Alert",
+      "description": "User resource alerts"
+    },
+    "/users/{userId}/usage/meter": {
+      "schema": "UsageQuota",
+      "description": "Real-time usage metering"
+    },
+    "/telemetry/{logId}": {
+      "schema": "TelemetryLog",
+      "description": "System-wide telemetry logs"
+    },
+    "/marketplace/{itemId}": {
+      "schema": "MarketplaceItem",
+      "description": "Public marketplace listings"
+    },
+    "/teams/{teamId}": {
+      "schema": "Team",
+      "description": "Enterprise organization units"
     }
   }
 }

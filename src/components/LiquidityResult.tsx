@@ -298,6 +298,54 @@ export const LiquidityResult: React.FC<Props> = ({ plan }) => {
           <h4 className="text-[10px] text-white/40 uppercase tracking-widest mb-3">Market Mapping</h4>
           <p className="text-white/80 text-xs leading-relaxed whitespace-pre-wrap font-mono border-l border-brand-primary/20 pl-4">{plan.marketMap}</p>
         </div>
+        
+        {/* Market Pressure Heatmap */}
+        <div className="bg-black/60 border border-white/10 rounded-xl p-5 space-y-4">
+          <div className="flex justify-between items-center">
+            <h4 className="text-[10px] text-white/40 uppercase tracking-widest flex items-center gap-2">
+              <Zap className="w-3 h-3 text-brand-secondary" />
+              Liquidity Pressure Heatmap
+            </h4>
+            <div className="flex gap-2">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded bg-brand-alert" />
+                <span className="text-[8px] text-white/40 uppercase">Sell</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded bg-brand-primary" />
+                <span className="text-[8px] text-white/40 uppercase">Buy</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-5 gap-1.5 h-32">
+            {[...Array(25)].map((_, i) => {
+              const intensity = Math.random();
+              const isSell = i % 3 === 0;
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: intensity * 0.8 + 0.2, scale: 1 }}
+                  transition={{ delay: i * 0.02 }}
+                  className={`rounded-sm flex items-center justify-center relative group cursor-crosshair ${
+                    isSell ? 'bg-brand-alert/40' : 'bg-brand-primary/40'
+                  }`}
+                >
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-white/20 transition-opacity" />
+                  {intensity > 0.8 && (
+                    <div className={`w-1 h-1 rounded-full animate-ping ${isSell ? 'bg-brand-alert' : 'bg-brand-primary'}`} />
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+          <div className="flex justify-between items-center text-[8px] text-white/20 font-mono uppercase tracking-tighter">
+            <span>Global Order Depth</span>
+            <span className="text-brand-primary">Update: T+200ms</span>
+          </div>
+        </div>
+
         <div className="bg-white/5 border border-white/10 rounded-lg p-5">
           <h4 className="text-[10px] text-white/40 uppercase tracking-widest mb-3">Execution Sequence</h4>
           <div className="space-y-2">

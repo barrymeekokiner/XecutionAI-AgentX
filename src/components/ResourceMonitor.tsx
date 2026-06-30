@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Cpu, HardDrive, Zap, Activity, Server, BarChart3, RefreshCcw, Loader2, CheckCircle2 } from 'lucide-react';
+import { Cpu, HardDrive, Zap, Activity, Server, BarChart3, RefreshCcw, Loader2, CheckCircle2, AlertTriangle, Bell } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { AppSettings, SystemAlert, ResourceMetric } from '../types';
 
-export const ResourceMonitor = () => {
+interface ResourceMonitorProps {
+  settings: AppSettings;
+  onUpdateSettings: (s: Partial<AppSettings>) => void;
+  onEmitMetric?: (m: ResourceMetric) => void;
+}
+
+export const ResourceMonitor: React.FC<ResourceMonitorProps> = ({ settings, onUpdateSettings, onEmitMetric }) => {
   const [metrics, setMetrics] = useState({
     gpu: 0,
     compute: 0,
@@ -12,9 +19,14 @@ export const ResourceMonitor = () => {
     history: [] as any[]
   });
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [quickScale, setQuickScale] = useState(1); // 1 = 100%, 2 = 200%, etc.
   const [optimizationSteps, setOptimizationSteps] = useState<string[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
   const [showOptimizedMessage, setShowOptimizedMessage] = useState(false);
+  const [alerts, setAlerts] = useState<SystemAlert[]>([]);
+  const [showThresholdEditor, setShowThresholdEditor] = useState(false);
+  const [predictiveMode, setPredictiveMode] = useState(false);
+  
   const optimizationRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -22,21 +34,61 @@ export const ResourceMonitor = () => {
       if (isOptimizing) return;
 
       setMetrics(prev => {
-        // More sophisticated fluctuation
+        // More sophisticated fluctuation influenced by quickScale
         const time = Date.now() / 1000;
-        const baseGpu = 40 + Math.sin(time / 5) * 10;
-        const newGpu = Math.floor(baseGpu + Math.random() * 20);
+        const baseGpu = (40 + Math.sin(time / 5) * 10) * quickScale;
+        const newGpu = Math.min(100, Math.floor(baseGpu + Math.random() * 20));
         
-        const baseCompute = 30 + Math.cos(time / 7) * 15;
-        const newCompute = Math.floor(baseCompute + Math.random() * 25);
+        const baseCompute = (30 + Math.cos(time / 7) * 15) * quickScale;
+        const newCompute = Math.min(100, Math.floor(baseCompute + Math.random() * 25));
         
         const newStorage = Math.floor(62 + Math.random() * 5);
         const newLoad = ((newGpu + newCompute) / 2).toFixed(1);
         
+        // Predictive Scaling Logic
+        if (predictiveMode && prev.history.length > 5) {
+          const trend = prev.history[prev.history.length - 1].load - prev.history[prev.history.length - 2].load;
+          if (trend > 5 && quickScale < 1.8) {
+            setQuickScale(s => Math.min(2.0, s + 0.2));
+            addAlert('compute', "Predictive scaling triggered: Preemptively allocating resources for upcoming spike.");
+          }
+        }
+
+        // Auto-scaling logic
+        if (settings.autoScaling) {
+          const loadVal = Number(newLoad);
+          if (loadVal > 85 && quickScale < 2.0) {
+            setQuickScale(prev => Math.min(2.0, prev + 0.1));
+          } else if (loadVal < 40 && quickScale > 0.5) {
+            setQuickScale(prev => Math.max(0.5, prev - 0.05));
+          }
+        }
+
+        // Threshold alerts
+        if (newGpu >= settings.gpuThreshold) {
+          addAlert('gpu', `CRITICAL: GPU utilization exceeded ${settings.gpuThreshold}%`);
+        }
+        if (newCompute >= settings.computeThreshold) {
+          addAlert('compute', `CRITICAL: Compute load exceeded ${settings.computeThreshold}%`);
+        }
+        
+        const newMetric: ResourceMetric = {
+          timestamp: Date.now(),
+          cpu: newCompute,
+          memory: newGpu,
+          efficiency: Math.max(0, 100 - (newGpu + newCompute) / 4),
+          buildId: 'current'
+        };
+
+        if (onEmitMetric && Math.random() > 0.8) {
+          onEmitMetric(newMetric);
+        }
+
         const newHistory = [...prev.history, {
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
           gpu: newGpu,
-          compute: newCompute
+          compute: newCompute,
+          load: Number(newLoad)
         }].slice(-30);
 
         return {
@@ -50,7 +102,28 @@ export const ResourceMonitor = () => {
     }, 1500);
 
     return () => clearInterval(interval);
-  }, [isOptimizing]);
+  }, [isOptimizing, quickScale, settings.autoScaling, settings.gpuThreshold, settings.computeThreshold]);
+
+  const addAlert = (type: 'gpu' | 'compute', message: string) => {
+    setAlerts(prevA => {
+      if (prevA.some(a => a.message === message && Date.now() - a.timestamp < 30000)) return prevA;
+      const newAlert: SystemAlert = { 
+        id: Math.random().toString(), 
+        type, 
+        message, 
+        timestamp: Date.now(),
+        isRead: false
+      };
+      return [newAlert, ...prevA].slice(0, 3);
+    });
+  };
+
+  const MetricTooltip = ({ title, desc }: { title: string, desc: string }) => (
+    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/90 backdrop-blur-md p-4 flex flex-col justify-center items-center text-center z-10 pointer-events-none">
+      <h4 className="text-[10px] text-brand-primary font-bold uppercase tracking-widest mb-1">{title}</h4>
+      <p className="text-[9px] text-white/60 font-mono leading-tight">{desc}</p>
+    </div>
+  );
 
   const handleOptimize = async () => {
     setIsOptimizing(true);
@@ -92,9 +165,44 @@ export const ResourceMonitor = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Active Alerts */}
+      <AnimatePresence>
+        {alerts.length > 0 && (
+          <div className="fixed top-24 right-6 z-[60] flex flex-col gap-2 pointer-events-none">
+            {alerts.map(alert => (
+              <motion.div
+                key={alert.id}
+                initial={{ opacity: 0, x: 20, scale: 0.9 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-brand-alert/90 backdrop-blur-md border border-brand-alert/20 p-4 rounded-xl shadow-[0_0_20px_rgba(var(--brand-alert-rgb),0.2)] flex items-center gap-3 pointer-events-auto"
+              >
+                <div className="p-2 bg-white/10 rounded-lg">
+                  <Bell className="w-4 h-4 text-white animate-bounce" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-white font-bold uppercase tracking-tight">Resource Alert</p>
+                  <p className="text-[9px] text-white/80 font-mono tracking-tighter">{alert.message}</p>
+                </div>
+                <button 
+                  onClick={() => setAlerts(prev => prev.filter(a => a.id !== alert.id))}
+                  className="ml-4 p-1 hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <RefreshCcw className="w-3 h-3 text-white/40" />
+                </button>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* GPU Usage */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6 relative overflow-hidden group">
+          <MetricTooltip 
+            title="Neural GPU Core" 
+            desc="Measures matrix operation utilization across distributed H100 clusters. Calculated via tensor flow saturation metrics."
+          />
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-brand-primary/5 blur-2xl rounded-full group-hover:bg-brand-primary/10 transition-colors" />
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-brand-primary/10 rounded-lg">
@@ -117,6 +225,10 @@ export const ResourceMonitor = () => {
 
         {/* Compute Power */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6 relative overflow-hidden group">
+          <MetricTooltip 
+            title="L40S Compute Power" 
+            desc="Represents the active CPU scheduling overhead for non-tensor tasks. Spikes indicate high I/O or model serialization."
+          />
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-brand-secondary/5 blur-2xl rounded-full group-hover:bg-brand-secondary/10 transition-colors" />
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-brand-secondary/10 rounded-lg">
@@ -139,6 +251,10 @@ export const ResourceMonitor = () => {
 
         {/* Distributed Storage */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6 relative overflow-hidden group">
+          <MetricTooltip 
+            title="Global KV Storage" 
+            desc="Persistence layer health. High utilization triggers automatic shard rebalancing across edge locations."
+          />
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-brand-alert/5 blur-2xl rounded-full group-hover:bg-brand-alert/10 transition-colors" />
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-brand-alert/10 rounded-lg">
@@ -247,10 +363,121 @@ export const ResourceMonitor = () => {
             <div className="p-2 bg-white/5 rounded-lg">
               <Server className="w-4 h-4 text-white" />
             </div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-widest">System Health</h3>
+            <h3 className="text-sm font-bold text-white uppercase tracking-widest">System Control</h3>
           </div>
 
           <div className="space-y-4">
+            <div className="flex justify-between items-center px-1">
+              <h3 className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Active Scaling Policies</h3>
+              <button 
+                onClick={() => setShowThresholdEditor(!showThresholdEditor)}
+                className="text-[9px] text-brand-primary hover:underline font-bold uppercase"
+              >
+                {showThresholdEditor ? 'Close Editor' : 'Edit Thresholds'}
+              </button>
+            </div>
+
+            <AnimatePresence>
+              {showThresholdEditor && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-4"
+                >
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-[9px] text-white/40 uppercase">GPU Alert Threshold</span>
+                      <span className="text-[9px] text-brand-primary font-mono">{settings.gpuThreshold}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="50" max="100" 
+                      value={settings.gpuThreshold} 
+                      onChange={(e) => onUpdateSettings({ gpuThreshold: parseInt(e.target.value) })}
+                      className="w-full accent-brand-primary"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-[9px] text-white/40 uppercase">Compute Alert Threshold</span>
+                      <span className="text-[9px] text-brand-secondary font-mono">{settings.computeThreshold}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="50" max="100" 
+                      value={settings.computeThreshold} 
+                      onChange={(e) => onUpdateSettings({ computeThreshold: parseInt(e.target.value) })}
+                      className="w-full accent-brand-secondary"
+                    />
+                  </div>
+                  <p className="text-[8px] text-white/20 italic">Thresholds are persisted to your neural profile.</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-xl">
+              <div className="flex flex-col">
+                <span className="text-[10px] text-white/40 uppercase font-mono">Predictive Allocation</span>
+                <span className="text-[8px] text-white/20 uppercase tracking-tighter">Preemptive resource spikes</span>
+              </div>
+              <button 
+                onClick={() => setPredictiveMode(!predictiveMode)}
+                className={`w-10 h-5 rounded-full relative transition-colors ${predictiveMode ? 'bg-brand-primary' : 'bg-white/10'}`}
+              >
+                <motion.div 
+                  animate={{ x: predictiveMode ? 22 : 2 }}
+                  className="absolute top-1 w-3 h-3 bg-white rounded-full shadow-sm"
+                />
+              </button>
+            </div>
+
+            {settings.experimentalFeatures && (
+              <div className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-white/40 uppercase font-mono tracking-widest">Neural Scale</span>
+                    <span className="text-[11px] text-brand-primary font-bold uppercase font-mono">{Math.round(quickScale * 100)}% Capacity</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {settings.autoScaling && (
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 bg-brand-primary/10 border border-brand-primary/20 rounded-full">
+                        <div className="w-1 h-1 rounded-full bg-brand-primary animate-pulse" />
+                        <span className="text-[8px] text-brand-primary font-bold uppercase">Auto-Scaling</span>
+                      </div>
+                    )}
+                    <div className="flex gap-1">
+                      {[0.5, 1.0, 1.5, 2.0].map((scale) => (
+                      <button
+                        key={scale}
+                        onClick={() => setQuickScale(scale)}
+                        className={`px-2 py-1 rounded text-[8px] font-bold transition-all ${
+                          quickScale === scale 
+                            ? 'bg-brand-primary text-black' 
+                            : 'bg-white/5 text-white/40 hover:bg-white/10'
+                        }`}
+                      >
+                        {scale}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="relative h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                  <motion.div 
+                    animate={{ width: `${(quickScale / 2) * 100}%` }}
+                    className={`h-full shadow-[0_0_8px_#00ff9d] transition-colors ${
+                      quickScale > 1.5 ? 'bg-brand-alert shadow-[0_0_8px_#ff1744]' : 'bg-brand-primary'
+                    }`}
+                    transition={{ duration: 1.5 - (settings.neuralIntensity / 100) }}
+                  />
+                </div>
+                <p className="text-[8px] text-white/20 italic leading-relaxed">
+                  Manually adjust simulated instance allocation. Higher scale increases neural fidelity but risks kernel thermal overflow.
+                </p>
+              </div>
+            )}
+
             <div className="p-3 bg-black/40 border border-white/5 rounded-xl space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] text-white/40 uppercase font-mono">Kernel Stability</span>

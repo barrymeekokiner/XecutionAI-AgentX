@@ -46,10 +46,15 @@ service cloud.firestore {
     }
 
     function isValidAppSettings(data) {
-      return data.apiKey is string && data.apiKey.size() <= 512 &&
+      let keys = data.keys();
+      return keys.hasAll(['tier', 'model']) &&
+             data.tier in ['free', 'standard', 'premium', 'enterprise'] &&
              data.model is string &&
-             data.autoRefine is bool &&
-             data.tier in ['free', 'standard', 'premium'];
+             (data.apiKey == null || (data.apiKey is string && data.apiKey.size() <= 512)) &&
+             (data.customSystemInstruction == null || data.customSystemInstruction is string) &&
+             (data.neuralIntensity == null || data.neuralIntensity is number) &&
+             (data.customCpuThreshold == null || data.customCpuThreshold is number) &&
+             (data.customMemoryThreshold == null || data.customMemoryThreshold is number);
     }
 
     // Collection Matches
@@ -70,6 +75,37 @@ service cloud.firestore {
         allow get: if isOwner(userId);
         allow write: if isOwner(userId) && isValidAppSettings(incoming());
       }
+
+      match /usage/meter {
+        allow read: if isOwner(userId);
+        allow write: if false; // Only server-side updates
+      }
+    }
+
+    match /telemetry/{logId} {
+      allow create: if request.auth != null;
+      allow read: if false; // Admin check placeholder
+    }
+
+    match /marketplace/{itemId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
+    }
+
+    match /teams/{teamId} {
+      allow read: if teamId == 'enterprise_config' || (request.auth != null && (resource.data.ownerId == request.auth.uid || request.auth.uid in resource.data.memberUids));
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && resource.data.ownerId == request.auth.uid;
+
+      match /audit_logs/{logId} {
+        allow read: if request.auth != null; // Simplified for now
+        allow create: if request.auth != null;
+      }
+    }
+
+    match /system_config/{configId} {
+      allow read, write: if false; // Only accessible via Admin SDK on server
     }
   }
 }
