@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LiquidityPlan, LiquidityAsset } from '../types';
-import { Table, BarChart3, Clock, ArrowUpRight, Zap } from 'lucide-react';
+import { Table, BarChart3, Clock, ArrowUpRight, Zap, Radar, Loader2, TrendingUp, AlertTriangle } from 'lucide-react';
 import { PriceChart } from './PriceChart';
 import { EmailDrafts } from './EmailDrafts';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
   plan?: LiquidityPlan;
@@ -12,8 +13,35 @@ export const LiquidityResult: React.FC<Props> = ({ plan }) => {
   const [sortKey, setSortKey] = useState<'speed' | 'value'>('speed');
   const [volume, setVolume] = useState(100); // Percentage
   const [marketInterest, setMarketInterest] = useState(100); // Percentage
+  const [sentinelData, setSentinelData] = useState<any>(null);
+  const [sentinelLoading, setSentinelLoading] = useState(false);
 
   if (!plan) return null;
+
+  const runSentinel = async () => {
+    setSentinelLoading(true);
+    try {
+      const res = await fetch('/api/market-sentinel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assets: plan.assetTable.map(a => a.asset) })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSentinelData(data);
+      }
+    } catch (e) {
+      console.error("Sentinel failed", e);
+    } finally {
+      setSentinelLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (plan && !sentinelData && !sentinelLoading) {
+      runSentinel();
+    }
+  }, [plan]);
 
   const adjustedAssets = plan.assetTable.map(asset => {
     const multiplier = (volume / 100) * (marketInterest / 100);
@@ -34,7 +62,93 @@ export const LiquidityResult: React.FC<Props> = ({ plan }) => {
   const isMaxExtractionHit = marketInterest >= 150;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Market Sentinel Scanner */}
+      <div className="relative overflow-hidden bg-black border border-white/10 rounded-xl p-6">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-brand-primary/5 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2" />
+        
+        <div className="flex items-center justify-between mb-6 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-brand-primary/10 rounded-lg">
+              <Radar className="w-4 h-4 text-brand-primary animate-spin-slow" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-white uppercase tracking-widest">Neural Market Sentinel</h3>
+              <p className="text-[10px] text-white/40 uppercase font-mono tracking-tighter">Scanning global OTC & Liquidity pools</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            {sentinelLoading && (
+              <div className="flex items-center gap-2 text-[9px] text-brand-primary font-mono animate-pulse uppercase">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Aggregating Order Books...
+              </div>
+            )}
+            {!sentinelLoading && (
+              <button 
+                onClick={runSentinel}
+                className="text-[9px] text-white/30 hover:text-brand-primary uppercase font-bold tracking-widest transition-colors flex items-center gap-1.5"
+              >
+                <TrendingUp className="w-3 h-3" />
+                Force Rescan
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 relative z-10">
+          <AnimatePresence mode="wait">
+            {sentinelData ? (
+              sentinelData.signals.slice(0, 4).map((signal: any, i: number) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="p-3 bg-white/[0.03] border border-white/5 rounded-xl space-y-2 group hover:border-brand-primary/30 transition-all"
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="text-[9px] text-white/40 font-mono truncate max-w-[100px]">{signal.asset}</span>
+                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                      signal.sentiment === 'BULLISH' ? 'bg-brand-primary/10 text-brand-primary' :
+                      signal.sentiment === 'BEARISH' ? 'bg-brand-alert/10 text-brand-alert' :
+                      'bg-white/10 text-white/60'
+                    }`}>
+                      {signal.sentiment}
+                    </span>
+                  </div>
+                  <div className="flex items-end justify-between">
+                    <div className="text-xl font-bold text-white font-mono">{signal.interestScore}<span className="text-[10px] text-white/20">/100</span></div>
+                    <span className="text-[8px] text-white/30 font-mono tracking-tighter">{signal.volumeSignal}</span>
+                  </div>
+                  <div className="h-0.5 w-full bg-white/5 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${signal.interestScore}%` }}
+                      className={`h-full ${signal.sentiment === 'BULLISH' ? 'bg-brand-primary shadow-[0_0_8px_#00ff9d]' : 'bg-brand-secondary'}`}
+                    />
+                  </div>
+                  <p className="text-[8px] text-white/40 leading-tight italic line-clamp-2 group-hover:line-clamp-none transition-all">{signal.reasoning}</p>
+                </motion.div>
+              ))
+            ) : (
+              [...Array(4)].map((_, i) => (
+                <div key={i} className="h-24 bg-white/5 animate-pulse rounded-xl" />
+              ))
+            )}
+          </AnimatePresence>
+        </div>
+
+        {sentinelData && (
+          <div className="mt-4 p-3 bg-brand-primary/5 border border-brand-primary/10 rounded-xl flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
+            <p className="text-[9px] text-brand-primary/80 leading-relaxed font-mono italic">
+              GLOBAL_OUTLOOK: {sentinelData.globalOutlook}
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Interactive Controls */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white/5 border border-white/10 rounded-lg p-5">
         <div className="space-y-3">

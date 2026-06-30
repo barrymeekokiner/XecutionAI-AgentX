@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "ExecutionResult": {
+      "title": "Execution Result",
+      "description": "A generated XecutionAI plan or audit result.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "input": { "type": "string" },
+        "mode": { "type": "string" },
+        "liquidityPlan": { "type": "object" },
+        "saasBuildPlan": { "type": "object" },
+        "saasBlueprint": { "type": "object" },
+        "marketingStrategy": { "type": "object" },
+        "riskReport": { "type": "object" },
+        "fastActionChecklist": { "type": "array", "items": { "type": "string" } },
+        "agentLogs": { "type": "array" },
+        "metrics": { "type": "object" }
+      },
+      "required": ["id", "timestamp", "input", "mode", "riskReport", "fastActionChecklist"]
+    },
+    "AppSettings": {
+      "title": "App Settings",
+      "description": "User preferences and configuration.",
+      "type": "object",
+      "properties": {
+        "apiKey": { "type": "string" },
+        "model": { "type": "string" },
+        "autoRefine": { "type": "boolean" },
+        "persistenceMode": { "type": "string", "enum": ["local", "cloud"] },
+        "tier": { "type": "string", "enum": ["free", "standard", "premium"] },
+        "customSystemInstruction": { "type": "string" }
+      }
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Basic user identity information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile data."
+    },
+    "/users/{userId}/results/{resultId}": {
+      "schema": "ExecutionResult",
+      "description": "User's generated results."
+    },
+    "/users/{userId}/settings/global": {
+      "schema": "AppSettings",
+      "description": "User's application settings."
+    }
+  }
+}

@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Master Gate catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity Validations
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.keys().size() <= 10 &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() <= 256;
+    }
+
+    function isValidExecutionResult(data) {
+      return data.keys().hasAll(['id', 'timestamp', 'input', 'mode', 'riskReport', 'fastActionChecklist']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.timestamp is number &&
+             data.input is string && data.input.size() <= 5000 &&
+             data.mode is string &&
+             data.riskReport is map &&
+             data.fastActionChecklist is list && data.fastActionChecklist.size() <= 100;
+    }
+
+    function isValidAppSettings(data) {
+      return data.apiKey is string && data.apiKey.size() <= 512 &&
+             data.model is string &&
+             data.autoRefine is bool &&
+             data.tier in ['free', 'standard', 'premium'];
+    }
+
+    // Collection Matches
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserProfile(incoming());
+      allow update: if isOwner(userId) && isValidUserProfile(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL']);
+      
+      match /results/{resultId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidExecutionResult(incoming());
+        allow delete: if isOwner(userId);
+      }
+
+      match /settings/global {
+        allow get: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidAppSettings(incoming());
+      }
+    }
+  }
+}

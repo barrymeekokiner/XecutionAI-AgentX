@@ -84,3 +84,12 @@ export interface ExecutionResult {
     latencyMs: number;
   };
 }
+
+export interface AppSettings {
+  apiKey: string;
+  model: string;
+  autoRefine: boolean;
+  persistenceMode: 'local' | 'cloud';
+  tier: 'free' | 'standard' | 'premium';
+  customSystemInstruction?: string;
+}
