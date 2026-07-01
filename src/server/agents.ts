@@ -1,6 +1,6 @@
 import { Type } from "@google/genai";
 
-export type AgentRole = 'CEO' | 'CTO' | 'Growth' | 'Finance' | 'Security' | 'MarketResearch' | 'Legal' | 'Compliance' | 'Operations';
+export type AgentRole = 'CEO' | 'CTO' | 'Growth' | 'Finance' | 'Security' | 'MarketResearch' | 'Legal' | 'Compliance' | 'Operations' | 'Developer';
 
 export interface AgentDefinition {
   role: AgentRole;
@@ -10,6 +10,35 @@ export interface AgentDefinition {
 }
 
 export const AGENT_DEFINITIONS: Record<AgentRole, AgentDefinition> = {
+  Developer: {
+    role: 'Developer',
+    name: 'Neural Engineer',
+    systemInstruction: `You are the Developer Agent. Your goal is to write high-quality, production-ready code.
+    You follow clean code principles, SOLID, and ensure type safety.
+    You specialize in React, Node.js, and TypeScript.
+    When given a feature request or an idea, you provide the necessary file structure and code implementations.`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        implementationPlan: { type: Type.STRING },
+        files: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              path: { type: Type.STRING },
+              language: { type: Type.STRING },
+              content: { type: Type.STRING },
+              explanation: { type: Type.STRING }
+            },
+            required: ["path", "language", "content"]
+          }
+        },
+        complexity: { type: Type.NUMBER },
+        decision: { type: Type.STRING, enum: ["PROCEED", "REVISE", "REJECT"] }
+      }
+    }
+  },
   CEO: {
     role: 'CEO',
     name: 'Visionary Strategist',

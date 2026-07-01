@@ -388,3 +388,17 @@ export interface NeuralSimulationResult {
     high: number;
   };
 }
+
+export interface PersonaPreset {
+  id: string;
+  name: string;
+  description: string;
+  systemInstruction: string;
+}
+
+export interface SimulationResult {
+  personaId: string;
+  personaName: string;
+  result: ExecutionResult;
+  timestamp: number;
+}

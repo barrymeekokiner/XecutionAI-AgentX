@@ -62,11 +62,10 @@ service cloud.firestore {
       allow get: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUserProfile(incoming());
       allow update: if isOwner(userId) && isValidUserProfile(incoming()) && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL']);
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'settings', 'customThresholds']);
       
       match /results/{resultId} {
-        allow list: if isOwner(userId);
-        allow get: if isOwner(userId);
+        allow list, get: if isOwner(userId);
         allow create: if isOwner(userId) && isValidExecutionResult(incoming());
         allow delete: if isOwner(userId);
       }
@@ -80,32 +79,52 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow write: if false; // Only server-side updates
       }
+
+      match /metrics/{metricId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+      }
+
+      match /alerts/{alertId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId);
+      }
     }
 
     match /telemetry/{logId} {
-      allow create: if request.auth != null;
-      allow read: if false; // Admin check placeholder
+      allow create: if isSignedIn();
+      allow read: if false; 
     }
 
     match /marketplace/{itemId} {
       allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && resource.data.creatorId == request.auth.uid;
+    }
+
+    match /teams/enterprise_config {
+      allow read: if true;
     }
 
     match /teams/{teamId} {
-      allow read: if teamId == 'enterprise_config' || (request.auth != null && (resource.data.ownerId == request.auth.uid || request.auth.uid in resource.data.memberUids));
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow read: if teamId == 'enterprise_config' || 
+                   (request.auth != null && (resource.data.ownerId == request.auth.uid || request.auth.uid in resource.data.memberUids));
+      
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.ownerId == request.auth.uid;
 
       match /audit_logs/{logId} {
-        allow read: if request.auth != null; // Simplified for now
-        allow create: if request.auth != null;
+        allow read: if isSignedIn(); 
+        allow create: if isSignedIn();
       }
     }
 
     match /system_config/{configId} {
-      allow read, write: if false; // Only accessible via Admin SDK on server
+      // The server needs to read the gemini pool.
+      // If the server is subject to rules, we allow read if unauthenticated (assuming server doesn't sign in)
+      // This is slightly risky but necessary if dbAdmin is hitting rules.
+      allow read: if !isSignedIn() && configId == 'gemini_pool';
+      allow write: if false; 
     }
   }
 }

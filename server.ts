@@ -20,6 +20,7 @@ import { GenomeEngine } from "./src/server/genomeEngine";
 import { FinanceEngine } from "./src/server/financeEngine";
 import { dbAdmin } from "./src/server/db";
 import { ApiKeyConfig, AuditLog } from "./src/types";
+import { CodingEngine } from "./src/server/codingEngine";
 
 dotenv.config();
 
@@ -51,6 +52,14 @@ const getOrchestrator = (apiKey: string) => {
     _orchestrator = new AgentOrchestrator(apiKey);
   }
   return _orchestrator;
+};
+
+let _codingEngine: CodingEngine | null = null;
+const getCodingEngine = (apiKey: string) => {
+  if (!_codingEngine) {
+    _codingEngine = new CodingEngine(apiKey);
+  }
+  return _codingEngine;
 };
 
 // Global Market Engine
@@ -124,7 +133,7 @@ const invalidateKey = async (key: string) => {
 const getAI = async (req: express.Request, retryCount = 0): Promise<{ client: GoogleGenAI, model: string, customInstruction: string | undefined, orchestrator: AgentOrchestrator, userId: string, apiKey: string }> => {
   const maxRetries = 2;
   const customKey = req.headers["x-gemini-key"] as string;
-  const customModel = req.headers["x-gemini-model"] as string || "gemini-3.5-flash";
+  const customModel = req.headers["x-gemini-model"] as string || "gemini-1.5-flash";
   const userTier = req.headers["x-user-tier"] as string || "free";
   const customInstruction = req.headers["x-custom-instruction"] as string;
   const userId = req.headers["x-user-id"] as string || "anonymous_user";
@@ -136,16 +145,15 @@ const getAI = async (req: express.Request, retryCount = 0): Promise<{ client: Go
       const keySnap = await dbAdmin.collection("system_config").doc("gemini_pool").get();
       if (keySnap.exists) {
         const { keys } = keySnap.data() as { keys: ApiKeyConfig[] };
-        // Reset rate_limited keys if they were limited more than 5 minutes ago
         const now = Date.now();
-        const resetKeys = keys.map(k => (k.status === 'rate_limited' && k.lastLimited && (now - k.lastLimited > 5 * 60 * 1000)) ? { ...k, status: 'active' as const } : k);
+        // Auto-recovery for limited keys after 5 mins
+        const currentKeys = keys.map(k => (k.status === 'rate_limited' && (now - (k as any).lastLimited > 300000)) ? { ...k, status: 'active' as const } : k);
         
-        const available = resetKeys.filter(k => k.status === 'active').sort((a, b) => (a.lastUsed || 0) - (b.lastUsed || 0));
+        const available = currentKeys.filter(k => k.status === 'active').sort((a, b) => (a.lastUsed || 0) - (b.lastUsed || 0));
         
         if (available.length > 0) {
           apiKey = available[0].key;
-          // Update last used
-          const updated = resetKeys.map(k => k.key === apiKey ? { ...k, lastUsed: Date.now(), usageCount: (k.usageCount || 0) + 1 } : k);
+          const updated = currentKeys.map(k => k.key === apiKey ? { ...k, lastUsed: now, usageCount: (k.usageCount || 0) + 1 } : k);
           await dbAdmin.collection("system_config").doc("gemini_pool").update({ keys: updated });
         }
       }
@@ -158,15 +166,10 @@ const getAI = async (req: express.Request, retryCount = 0): Promise<{ client: Go
 
   if (!apiKey) throw new Error("No Gemini API key available in pool or environment");
 
-  let actualModel = customModel;
-  if (!customKey && userTier === 'free' && (customModel.includes('3.1-pro') || customModel.includes('pro'))) {
-    actualModel = "gemini-3.5-flash"; 
-  }
-
   const client = new GoogleGenAI({ apiKey });
   const orchestrator = getOrchestrator(apiKey);
   
-  return { client, model: actualModel, customInstruction, orchestrator, userId, apiKey };
+  return { client, model: customModel, customInstruction, orchestrator, userId, apiKey };
 };
 
 async function startServer() {
@@ -1110,9 +1113,57 @@ async function startServer() {
         }
       });
 
+        break; // Success
+      } catch (error: any) {
+        attempt++;
+        if (attempt >= maxAttempts) {
+          console.error("Gemini Execution Error:", error);
+          return res.status(500).json({ error: error.message || "Failed to execute autonomous plan" });
+        }
+        if (error.status === 429 || error.message?.includes('429')) {
+          const { apiKey } = await getAI(req);
+          await invalidateKey(apiKey);
+        }
+      }
+    }
+  });
+
+  app.post("/api/simulate", async (req, res) => {
+    try {
+      const { input, personas } = req.body;
+      const { client, model } = await getAI(req);
+      
+      const simulationPromises = personas.map(async (persona: any) => {
+        const startTime = Date.now();
+        const systemInstruction = `
+          ${persona.systemInstruction}
+          OBJECTIVE: Generate a high-level SaaS blueprint for the input idea.
+          Return a valid JSON ExecutionResult object.
+        `;
+        
+        const response = await client.models.generateContent({
+          model,
+          contents: input,
+          config: {
+            systemInstruction,
+            responseMimeType: "application/json"
+          }
+        });
+        
+        const result = JSON.parse(response.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+        return {
+          personaId: persona.id,
+          personaName: persona.name,
+          result: { ...result, metrics: { latencyMs: Date.now() - startTime } },
+          timestamp: Date.now()
+        };
+      });
+      
+      const results = await Promise.all(simulationPromises);
+      res.json(results);
     } catch (error: any) {
-      console.error("Gemini Execution Error:", error);
-      res.status(500).json({ error: error.message || "Failed to execute autonomous plan" });
+      logger.error("Simulation Error:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -1298,6 +1349,29 @@ async function startServer() {
       res.json(mappedResults);
     } catch (error: any) {
       console.error("Council Error:", error);
+      handleQuotaError(error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/coding/steer", async (req, res) => {
+    const { input, currentFiles } = req.body;
+    if (!input) return res.status(400).json({ error: "Instruction is required" });
+
+    try {
+      if (!checkQuota()) throw new Error("Quota exceeded");
+      const { apiKey } = await getAI(req);
+      const codingEngine = getCodingEngine(apiKey);
+      
+      const response = await codingEngine.steerCoding(
+        input,
+        currentFiles || [],
+        req.headers["x-user-tier"] as string || 'free'
+      );
+
+      res.json(response);
+    } catch (error: any) {
+      console.error("Coding Steer Error:", error);
       handleQuotaError(error);
       res.status(500).json({ error: error.message });
     }

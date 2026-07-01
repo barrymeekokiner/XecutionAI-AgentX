@@ -56,7 +56,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   user
 }) => {
   const [settings, setSettings] = useState<AppSettings>(currentSettings);
-  const [activeTab, setActiveTab] = useState<'general' | 'analytics'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'analytics' | 'brand'>('general');
   const [showKey, setShowKey] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [verifyError, setVerifyError] = useState<string | null>(null);
@@ -64,12 +64,18 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const [showStripe, setShowStripe] = useState<{tier: 'standard' | 'premium'} | null>(null);
   const [analytics, setAnalytics] = useState<any>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [whiteLabel, setWhiteLabel] = useState({ logo: '', primaryColor: '#00ff9d', companyName: 'XecutionAI' });
 
   useEffect(() => {
     if (isOpen) {
       setSettings(currentSettings);
     }
   }, [isOpen, currentSettings]);
+
+  // Handle white label changes for live preview
+  const handleWhiteLabelChange = (key: string, value: string) => {
+    setWhiteLabel(prev => prev ? { ...prev, [key]: value } : null);
+  };
 
   const models = [
     { id: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash-8B', tier: 'FREE', speed: 'Ultra-Fast', intelligence: 'Standard' },
@@ -206,11 +212,18 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 {activeTab === 'general' && <motion.div layoutId="settingsTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary" />}
               </button>
               <button
+                onClick={() => setActiveTab('brand')}
+                className={`px-4 py-3 text-[10px] uppercase tracking-widest font-bold transition-all relative ${activeTab === 'brand' ? 'text-brand-primary' : 'text-white/40 hover:text-white/60'}`}
+              >
+                Brand
+                {activeTab === 'brand' && <motion.div layoutId="settingsTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary" />}
+              </button>
+              <button
                 onClick={() => setActiveTab('analytics')}
-                className={`px-4 py-3 text-[10px] uppercase tracking-widest font-bold transition-all relative ${activeTab === 'analytics' ? 'text-brand-secondary' : 'text-white/40 hover:text-white/60'}`}
+                className={`px-4 py-3 text-[10px] uppercase tracking-widest font-bold transition-all relative ${activeTab === 'analytics' ? 'text-brand-primary' : 'text-white/40 hover:text-white/60'}`}
               >
                 Analytics
-                {activeTab === 'analytics' && <motion.div layoutId="settingsTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-secondary" />}
+                {activeTab === 'analytics' && <motion.div layoutId="settingsTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary" />}
               </button>
             </div>
 
@@ -498,6 +511,98 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     <span className={`text-[10px] font-mono uppercase ${verifyStatus === 'success' ? 'text-brand-primary' : verifyStatus === 'error' ? 'text-brand-alert' : 'text-white/20'}`}>
                       {verifyStatus === 'success' ? 'Synchronized' : verifyStatus === 'error' ? 'Degraded' : 'Awaiting Link'}
                     </span>
+                  </div>
+                </div>
+              ) : activeTab === 'brand' ? (
+                <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <label className="text-xs font-bold text-white/60 uppercase tracking-widest flex items-center gap-2">
+                        <Palette className="w-3 h-3 text-brand-primary" />
+                        Brand Customization
+                      </label>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-bold text-white/40 uppercase">Company Name</label>
+                            <input 
+                              type="text" 
+                              value={whiteLabel.companyName} 
+                              onChange={(e) => setWhiteLabel({ ...whiteLabel, companyName: e.target.value })}
+                              className="w-full bg-black border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/80 focus:border-brand-primary/50 transition-all"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-bold text-white/40 uppercase">Primary Brand Color</label>
+                            <div className="flex gap-2">
+                              <input 
+                                type="color" 
+                                value={whiteLabel.primaryColor} 
+                                onChange={(e) => setWhiteLabel({ ...whiteLabel, primaryColor: e.target.value })}
+                                className="w-10 h-10 bg-transparent border-none cursor-pointer rounded overflow-hidden"
+                              />
+                              <input 
+                                type="text" 
+                                value={whiteLabel.primaryColor} 
+                                onChange={(e) => setWhiteLabel({ ...whiteLabel, primaryColor: e.target.value })}
+                                className="flex-1 bg-black border border-white/10 rounded-xl px-4 py-2 text-sm font-mono text-white/80"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-bold text-white/40 uppercase">Logo URL</label>
+                            <input 
+                              type="text" 
+                              placeholder="https://..."
+                              value={whiteLabel.logo} 
+                              onChange={(e) => setWhiteLabel({ ...whiteLabel, logo: e.target.value })}
+                              className="w-full bg-black border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/80"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Live Preview */}
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-bold text-white/40 uppercase text-center block">Live Preview</label>
+                          <div className="bg-black/60 border border-white/10 rounded-2xl p-6 aspect-square flex flex-col items-center justify-center space-y-6 relative overflow-hidden group">
+                            {/* Simulated UI Element */}
+                            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundColor: whiteLabel.primaryColor }} />
+                            
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 overflow-hidden">
+                              {whiteLabel.logo ? (
+                                <img src={whiteLabel.logo} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              ) : (
+                                <Zap className="w-8 h-8" style={{ color: whiteLabel.primaryColor }} />
+                              )}
+                            </div>
+                            
+                            <div className="text-center">
+                              <h4 className="text-lg font-black italic uppercase tracking-tighter text-white" style={{ color: whiteLabel.companyName ? 'white' : 'rgba(255,255,255,0.2)' }}>
+                                {whiteLabel.companyName || 'Your Brand'}
+                              </h4>
+                              <p className="text-[8px] text-white/40 uppercase tracking-widest font-mono">Neural Execution Engine</p>
+                            </div>
+
+                            <button 
+                              className="px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                              style={{ backgroundColor: whiteLabel.primaryColor, color: '#000', boxShadow: `0 0 20px ${whiteLabel.primaryColor}40` }}
+                            >
+                              Get Started
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-brand-primary/5 border border-brand-primary/20 rounded-xl flex items-start gap-3">
+                      <Info className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
+                      <p className="text-[9px] text-white/60 leading-relaxed uppercase font-mono">
+                        These changes are currently in <span className="text-brand-primary font-bold">Simulated Preview</span>. Apply changes to persist this identity to your enterprise cluster.
+                      </p>
+                    </div>
                   </div>
                 </div>
               ) : (

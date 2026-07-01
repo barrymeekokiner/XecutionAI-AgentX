@@ -55,6 +55,7 @@ import { WelcomeTour } from './components/WelcomeTour';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import { ResourceMonitor } from './components/ResourceMonitor';
 import { NeuralRehearsal } from './components/NeuralRehearsal';
+import { SandboxedSimulation } from './components/SandboxedSimulation';
 
 import { MarketIntelligence } from './components/MarketIntelligence';
 import { SaaSGenome } from './components/SaaSGenome';
@@ -66,6 +67,7 @@ import { SaaSGenomeChart } from './components/SaaSGenomeChart';
 import { AgentPerformanceDashboard } from './components/AgentPerformanceDashboard';
 import { AgentDialoguePanel } from './components/AgentDialoguePanel';
 import { ProjectForge } from './components/ProjectForge';
+import { AgenticCodingStudio } from './components/AgenticCodingStudio';
 import { 
   ResourceMetric as ResourceMetricType, 
   AgentStatus, 
@@ -296,7 +298,7 @@ export default function App() {
   const [saasGenome, setSaasGenome] = useState<SaaSGenomeType | null>(null);
   const [performanceMetrics, setPerformanceMetrics] = useState<AgentPerformanceMetrics[]>([]);
   const [founderMode, setFounderMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<'plan' | 'market' | 'genome' | 'council' | 'revenue' | 'marketing' | 'risks' | 'logs' | 'resources' | 'efficiency' | 'summary' | 'market_engine' | 'performance' | 'forge' | 'marketplace' | 'enterprise' | 'creator'>('plan');
+  const [activeTab, setActiveTab] = useState<'plan' | 'market' | 'genome' | 'council' | 'revenue' | 'marketing' | 'risks' | 'logs' | 'resources' | 'efficiency' | 'summary' | 'market_engine' | 'performance' | 'forge' | 'marketplace' | 'enterprise' | 'creator' | 'sandbox' | 'vibe_studio'>('plan');
   const [isDialogueOpen, setIsDialogueOpen] = useState(false);
   const [efficiencyMetrics, setEfficiencyMetrics] = useState<ResourceMetricType[]>([]);
   const [blueprints, setBlueprints] = useState<{ label: string; value: string; mode: string }[]>([]);
@@ -370,6 +372,8 @@ export default function App() {
           tokenUsage: data.tokenUsage || prev.tokenUsage
         }));
       }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, 'teams/enterprise_config');
     });
 
     return () => unsub();
@@ -1626,6 +1630,16 @@ export default function App() {
                   </div>
                   <h2 className="text-lg font-bold text-white uppercase tracking-[0.3em] mb-2">Idle System</h2>
                   <p className="text-white/30 text-[10px] uppercase tracking-widest font-mono">Awaiting routing instructions...</p>
+                  
+                  {input && (
+                    <button 
+                      onClick={() => setActiveTab('sandbox')}
+                      className="mt-6 px-6 py-2 bg-brand-secondary/20 border border-brand-secondary/50 text-brand-secondary text-[10px] font-bold uppercase rounded-lg hover:bg-brand-secondary/30 transition-all flex items-center gap-2 animate-in fade-in zoom-in duration-500"
+                    >
+                      <Layers className="w-3 h-3" />
+                      Neural Sandbox Simulation
+                    </button>
+                  )}
                 </div>
               </motion.div>
             ) : loading ? (
@@ -1726,7 +1740,7 @@ export default function App() {
                 {/* Visual Tabs */}
                 <div className="flex justify-between items-end border-b border-white/10 pb-2">
                   <div className="flex gap-4 overflow-x-auto no-scrollbar whitespace-nowrap pb-1">
-                    {(['plan', 'market', 'market_engine', 'genome', 'council', 'revenue', 'marketing', 'risks', 'resources', 'efficiency', 'performance', 'forge', 'marketplace', 'enterprise', 'creator', 'summary', 'logs'] as const).map((tab) => {
+                    {(['plan', 'vibe_studio', 'market', 'market_engine', 'genome', 'council', 'revenue', 'marketing', 'risks', 'resources', 'efficiency', 'performance', 'forge', 'marketplace', 'enterprise', 'creator', 'sandbox', 'summary', 'logs'] as const).map((tab) => {
                       // Hide tabs if no data
                       if (tab === 'genome' && !saasGenome && !result?.saasGenome) return null;
                       if (tab === 'council' && !result?.councilDebate) return null;
@@ -1759,6 +1773,8 @@ export default function App() {
                            tab === 'creator' ? 'Creator Studio' :
                            tab === 'performance' ? 'Performance' :
                            tab === 'forge' ? 'Neural Forge' :
+                           tab === 'vibe_studio' ? 'Vibe Studio' :
+                           tab === 'sandbox' ? 'Sandbox' :
                            tab === 'summary' ? 'Summary' :
                            tab === 'resources' ? 'Resources' : 'Telemetry'}
                         </button>
@@ -1778,6 +1794,11 @@ export default function App() {
                 </div>
 
                 <div className="space-y-8">
+                  {activeTab === 'sandbox' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                       <SandboxedSimulation input={input} settings={settings} />
+                    </div>
+                  )}
                   {activeTab === 'plan' && (
                     <>
                       {/* Intelligence Alert */}
@@ -1921,6 +1942,9 @@ export default function App() {
                   )}
                   {activeTab === 'creator' && (
                     <CreatorStudio />
+                  )}
+                  {activeTab === 'vibe_studio' && (
+                    <AgenticCodingStudio />
                   )}
                   {activeTab === 'summary' && (
                     <ExecutiveSummary activeBuilds={history} />
